@@ -1,0 +1,21 @@
+# Dependencias (Pesadísimas, no subir)
+node_modules/
+*/node_modules/
+
+# Variables de Entorno (SEGURIDAD CRÍTICA)
+.env
+*/.env
+
+# Archivos de sistema y logs
+.DS_Store
+npm-debug.log
+yarn-error.log
+
+# Build de producción
+dist/
+build/
+*/dist/
+*/build/
+
+# Config de Vite local
+.vite/
