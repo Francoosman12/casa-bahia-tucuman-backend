@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 
-// Variable global para cachear la conexión entre ejecuciones "calientes"
 let cached = global.mongoose;
 
 if (!cached) {
@@ -8,21 +7,22 @@ if (!cached) {
 }
 
 export const connectDB = async () => {
-  // 1. Si ya hay conexión activa, úsala (Rápido ⚡)
   if (cached.conn) {
     return cached.conn;
   }
 
-  // 2. Si no hay conexión, créala
   if (!cached.promise) {
+    // 👇 CAMBIO AQUÍ: Activamos el buffer (o borra opts si quieres default)
+    // Esto hace que si la conexión tarda un milisegundo más, Mongoose espere 
+    // en lugar de lanzar error inmediatamente.
     const opts = {
-      bufferCommands: false, // Desactivar buffer para errores inmediatos
+      bufferCommands: true, 
     };
 
-    console.log("🔄 Estableciendo NUEVA conexión a MongoDB Atlas...");
+    console.log("🔄 Conectando a MongoDB en Vercel...");
     
     cached.promise = mongoose.connect(process.env.MONGO_URI, opts).then((mongoose) => {
-      console.log("✅ MongoDB Conectado");
+      console.log("✅ Conectado");
       return mongoose;
     });
   }
@@ -31,7 +31,6 @@ export const connectDB = async () => {
     cached.conn = await cached.promise;
   } catch (e) {
     cached.promise = null;
-    console.error("❌ Error de conexión MongoDB:", e);
     throw e;
   }
 
