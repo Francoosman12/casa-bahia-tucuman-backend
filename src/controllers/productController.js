@@ -115,49 +115,59 @@ export const deleteProduct = async (req, res) => {
     }
 };
 
-// ACTUALIZAR PRODUCTO (PUT)
+// 5. ACTUALIZAR PRODUCTO (PUT) - CORREGIDO
 export const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        let imagesData = [];
-
+        
         // 1. Buscamos el producto actual
         const product = await Product.findById(id);
         if (!product) return res.status(404).json({ message: "Producto no encontrado" });
 
-        // 2. Si subieron fotos nuevas, las procesamos
-        if (req.files && req.files.length > 0) {
-            req.files.map(file => {
-                imagesData.push({
-                    url: file.path,
-                    public_id: file.filename
-                });
-            });
-            product.images.push(...imagesData); 
+        // --- 📸 GESTIÓN DE IMÁGENES (AQUÍ ESTÁ EL CAMBIO) ---
+
+        // A. Si el frontend nos manda la lista de imágenes viejas (las que no borró),
+        // reemplazamos el array de imágenes del producto con esa lista filtrada.
+        // Nota: Por FormData esto llega como un string, así que lo parseamos.
+        if (req.body.existingImages) {
+            product.images = JSON.parse(req.body.existingImages);
         }
 
-        // 3. Actualizamos los campos de texto
+        // B. Si subieron fotos NUEVAS, las procesamos y las agregamos a la lista
+        if (req.files && req.files.length > 0) {
+            const newImages = req.files.map(file => ({
+                url: file.path,
+                public_id: file.filename
+            }));
+            product.images.push(...newImages); 
+        }
+
+        // --- 📝 ACTUALIZACIÓN DE DATOS (TEXTO) ---
         product.name = req.body.name || product.name;
         product.sku = req.body.sku || product.sku;
         product.priceBase = req.body.priceBase || product.priceBase;
         product.stock = req.body.stock || product.stock;
         product.description = req.body.description || product.description;
         product.category = req.body.category || product.category;
-        product.videoUrl = req.body.videoUrl !== undefined ? req.body.videoUrl : product.videoUrl;
-
-        // 👇 4. ACTUALIZACIÓN DEL ESTADO (NUEVO)
-        // Verificamos si 'isActive' viene en el body. Si viene, lo asignamos.
-        // Nota: Con FormData "false" llega como string, pero Mongoose lo arregla.
+        
+        // Manejo cuidadoso de campos opcionales/booleanos
+        if (req.body.videoUrl !== undefined) product.videoUrl = req.body.videoUrl;
+        
         if (req.body.isActive !== undefined) {
-            product.isActive = req.body.isActive;
+            // Convertimos a booleano real por si viene como string "true"/"false" en FormData
+            product.isActive = req.body.isActive === 'true' || req.body.isActive === true;
         }
 
-        // 5. Guardar cambios
+        if (req.body.isFeatured !== undefined) {
+            product.isFeatured = req.body.isFeatured === 'true' || req.body.isFeatured === true;
+        }
+
+        // 4. Guardar cambios
         const updatedProduct = await product.save();
         res.json(updatedProduct);
 
     } catch (error) {
-        console.error(error);
-        res.status(400).json({ message: "Error al actualizar producto" });
+        console.error("Error en updateProduct:", error);
+        res.status(400).json({ message: "Error al actualizar producto", error: error.message });
     }
 };
