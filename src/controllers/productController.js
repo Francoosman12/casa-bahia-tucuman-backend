@@ -1,38 +1,42 @@
 import Product from '../models/Product.js';
 import FinancialConfig from '../models/FinancialConfig.js';
 
-// GET ALL PRODUCTS con Precios Calculados
+// GET ALL PRODUCTS con Precios Calculados (LÓGICA NUEVA)
 export const getProducts = async (req, res) => {
     try {
         // 1. Obtener Configuración Financiera
         let config = await FinancialConfig.findOne({ configName: 'MAIN' });
         
-        // Valores por defecto
-        const cashDiscount = config ? config.cashDiscount : 0;
+        // REUTILIZAMOS EL CAMPO 'cashDiscount' COMO 'MARGEN DE LISTA'
+        // Si antes era 10 (descuento), ahora pones 45 (recargo) en el Admin.
+        const listMarkup = config ? config.cashDiscount : 0; 
         const plans = config ? config.cardPlans : [];
 
-        // --- 👇 CAMBIO PRINCIPAL AQUÍ 👇 ---
         // Definir el filtro: Si piden "all", traemos todo (Admin). Si no, solo activos (Público).
         const filter = req.query.all === 'true' ? {} : { isActive: true };
 
         // 2. Obtener Productos con el filtro dinámico y categoría poblada
         const products = await Product.find(filter)
-                                      .sort({ createdAt: -1 }) // Opcional: Ordenar por más nuevos primero
+                                      .sort({ createdAt: -1 }) 
                                       .populate('category', 'name slug');
 
-        // 3. MAPEO: Calcular precios al vuelo (Esto sigue igual)
+        // 3. MAPEO: Calcular precios al vuelo
         const productsWithPricing = products.map(p => {
             const product = p.toObject(); 
 
-            // A. Precio Contado (Base - Descuento)
-            const priceCash = product.priceBase * (1 - (cashDiscount / 100));
+            // A. PRECIO CONTADO (AHORA ES EL PRECIO BASE PURO)
+            const priceCash = product.priceBase;
 
-            // B. Calcular opciones de tarjetas
+            // B. PRECIO LISTA (CALCULADO: BASE + MARGEN %)
+            // Ejemplo: 10000 * 1.45 = 14500
+            const priceList = Math.round(priceCash * (1 + (listMarkup / 100)));
+
+            // C. PLANES DE TARJETA
+            // Se calculan sobre el precio de Contado + el Interés del Plan
             const financing = plans
                 .filter(plan => plan.isActive)
                 .map(plan => {
-                    // Precio Lista + Interés del plan
-                    const finalPrice = product.priceBase * (1 + (plan.interestRate / 100));
+                    const finalPrice = priceCash * (1 + (plan.interestRate / 100));
                     return {
                         planName: plan.name,
                         installments: plan.installments,
@@ -44,9 +48,10 @@ export const getProducts = async (req, res) => {
             return {
                 ...product,
                 prices: {
-                    base: product.priceBase,
+                    base: priceCash, // La base ahora es el contado
                     cash: Math.round(priceCash),
-                    discountPct: cashDiscount,
+                    list: priceList, // Nuevo campo para el precio tachado
+                    listMarkup: listMarkup, // El % usado (por si sirve para debug)
                     financing: financing 
                 }
             };
