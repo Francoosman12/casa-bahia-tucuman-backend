@@ -25,3 +25,32 @@ export const createCategory = async (req, res) => {
         res.status(400).json({ message: "Error al crear categoría", error: error.message });
     }
 };
+
+// ACTUALIZAR CATEGORÍA
+export const updateCategory = async (req, res) => {
+    try {
+        const { name } = req.body;
+        const category = await Category.findById(req.params.id);
+
+        if (!category) return res.status(404).json({ message: "Categoría no encontrada" });
+
+        category.name = name || category.name;
+        // Regeneramos el slug si cambió el nombre
+        if (name) category.slug = name.toLowerCase().split(' ').join('-');
+
+        const updatedCategory = await category.save();
+        res.json(updatedCategory);
+    } catch (error) {
+        res.status(500).json({ message: "Error al actualizar" });
+    }
+};
+
+// ELIMINAR CATEGORÍA
+export const deleteCategory = async (req, res) => {
+    try {
+        await Category.findByIdAndDelete(req.params.id);
+        res.json({ message: "Categoría eliminada" });
+    } catch (error) {
+        res.status(500).json({ message: "Error al eliminar" });
+    }
+};
